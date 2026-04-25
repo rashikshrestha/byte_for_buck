@@ -1,690 +1,1231 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Storage Market Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Storage Market Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f18;--surface:#161925;--surface2:#1e2235;
+  --border:#252a3d;--text:#e2e8f0;--muted:#64748b;--muted2:#94a3b8;
+  --accent:#6366f1;--accent2:#818cf8;
+  --green:#10b981;--yellow:#f59e0b;--pink:#ec4899;--purple:#8b5cf6;--blue:#3b82f6;--cyan:#06b6d4;
+  --sidebar-w:260px;
+  --hdd:#3b82f6;--ssd:#10b981;--phdd:#f59e0b;--pssd:#ec4899;
+  --tape:#8b5cf6;--other:#64748b;
+}
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px}
 
-    :root {
-      --bg:       #0f1117;
-      --surface:  #1a1d27;
-      --border:   #2a2d3e;
-      --text:     #e2e8f0;
-      --muted:    #8892a4;
-      --accent:   #6366f1;
+/* ── Top bar ── */
+.topbar{
+  display:flex;align-items:center;gap:1rem;
+  padding:.6rem 1rem;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;z-index:10;
+}
+.topbar h1{font-size:.95rem;font-weight:700;white-space:nowrap;
+  background:linear-gradient(90deg,#818cf8,#34d399);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.topbar .subtitle{font-size:.72rem;color:var(--muted);white-space:nowrap}
+.topbar .spacer{flex:1}
+.count-badge{
+  background:var(--surface2);border:1px solid var(--border);border-radius:20px;
+  padding:.25rem .75rem;font-size:.75rem;color:var(--muted2);white-space:nowrap;flex-shrink:0
+}
+.count-badge span{color:var(--accent2);font-weight:700}
+.btn-reset{
+  background:transparent;border:1px solid var(--border);border-radius:6px;
+  color:var(--muted2);padding:.3rem .7rem;font-size:.72rem;cursor:pointer;
+  transition:all .15s;white-space:nowrap;flex-shrink:0
+}
+.btn-reset:hover{border-color:var(--accent);color:var(--accent2)}
 
-      --hdd:      #3b82f6;
-      --ssd:      #10b981;
-      --phdd:     #f59e0b;
-      --pssd:     #ec4899;
-      --tape:     #8b5cf6;
-      --other:    #64748b;
-    }
+/* ── Active filter pills ── */
+.pills-row{
+  display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;
+  padding:.35rem 1rem;background:var(--surface);
+  border-bottom:1px solid var(--border);min-height:34px;flex-shrink:0
+}
+.pill{
+  display:flex;align-items:center;gap:.3rem;
+  background:var(--accent)22;border:1px solid var(--accent)55;
+  border-radius:20px;padding:.15rem .5rem;font-size:.68rem;color:var(--accent2)
+}
+.pill button{background:none;border:none;color:var(--accent2);cursor:pointer;font-size:.75rem;
+  line-height:1;padding:0 0 0 2px;opacity:.7}
+.pill button:hover{opacity:1}
+.pills-empty{font-size:.72rem;color:var(--muted);opacity:.5}
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
-    }
+/* ── Body layout ── */
+.body-layout{display:flex;flex:1;overflow:hidden}
 
-    /* ── Header ── */
-    header {
-      background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
-      border-bottom: 1px solid var(--border);
-      padding: 2.5rem 2rem 2rem;
-      text-align: center;
-    }
-    header h1 {
-      font-size: clamp(1.6rem, 4vw, 2.4rem);
-      font-weight: 700;
-      letter-spacing: -0.5px;
-      background: linear-gradient(90deg, #818cf8, #34d399);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    header p {
-      margin-top: .6rem;
-      color: var(--muted);
-      font-size: .95rem;
-      max-width: 620px;
-      margin-inline: auto;
-    }
+/* ── Sidebar ── */
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  background:var(--surface);border-right:1px solid var(--border);
+  overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent
+}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border)}
 
-    /* ── KPI cards ── */
-    .kpi-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      padding: 1.5rem 2rem;
-      justify-content: center;
-    }
-    .kpi {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.1rem 1.6rem;
-      flex: 1 1 160px;
-      max-width: 210px;
-      text-align: center;
-    }
-    .kpi .value {
-      font-size: 1.7rem;
-      font-weight: 700;
-      color: #818cf8;
-    }
-    .kpi .label {
-      font-size: .75rem;
-      color: var(--muted);
-      margin-top: .3rem;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-    }
+.sidebar-header{
+  padding:.8rem 1rem .6rem;font-size:.65rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--muted);
+  border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center
+}
+.filter-section{padding:.7rem 1rem;border-bottom:1px solid var(--border)}
+.filter-label{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--muted);margin-bottom:.5rem;display:block}
 
-    /* ── Story strip ── */
-    .story {
-      background: #1e1b4b22;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem;
-      text-align: center;
-      font-size: .9rem;
-      color: var(--muted);
-      font-style: italic;
-    }
+/* Type toggle pills */
+.type-pills{display:flex;flex-wrap:wrap;gap:.3rem}
+.type-pill{
+  border:1px solid var(--border);border-radius:20px;
+  padding:.2rem .5rem;font-size:.68rem;cursor:pointer;
+  transition:all .15s;color:var(--muted2);background:transparent;
+  white-space:nowrap
+}
+.type-pill.active{color:#fff;border-color:transparent}
+.type-pill[data-type="HDD"].active{background:#3b82f6}
+.type-pill[data-type="SSD"].active{background:#10b981}
+.type-pill[data-type="Portable HDD"].active{background:#f59e0b}
+.type-pill[data-type="Portable SSD"].active{background:#ec4899}
+.type-pill[data-type="Tape Cartridge"].active{background:#8b5cf6}
+.type-pill[data-type="other"].active{background:#64748b}
 
-    /* ── Grid ── */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
-      gap: 1.25rem;
-      padding: 1.5rem 2rem 3rem;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
+/* Radio tabs */
+.radio-tabs{display:flex;background:var(--bg);border-radius:8px;padding:2px;gap:2px}
+.radio-tab{
+  flex:1;text-align:center;padding:.3rem;font-size:.72rem;
+  border-radius:6px;cursor:pointer;color:var(--muted);transition:all .15s;border:none;background:none
+}
+.radio-tab.active{background:var(--surface2);color:var(--text);font-weight:600}
 
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1.4rem 1.6rem;
-      display: flex;
-      flex-direction: column;
-    }
-    .card.wide { grid-column: 1 / -1; }
+/* Toggle switch */
+.toggle-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem}
+.toggle-row:last-child{margin-bottom:0}
+.toggle-label{font-size:.75rem;color:var(--muted2)}
+.toggle{position:relative;display:inline-block;width:34px;height:18px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{
+  position:absolute;inset:0;background:var(--border);border-radius:18px;
+  cursor:pointer;transition:.2s
+}
+.toggle-slider::before{
+  content:'';position:absolute;width:12px;height:12px;
+  left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.2s
+}
+.toggle input:checked+.toggle-slider{background:var(--accent)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(16px);background:#fff}
 
-    .card-title {
-      font-size: .8rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .07em;
-      color: var(--muted);
-      margin-bottom: 1rem;
-    }
-    .card-title span {
-      display: block;
-      font-size: 1rem;
-      text-transform: none;
-      letter-spacing: 0;
-      color: var(--text);
-      font-weight: 600;
-      margin-top: .15rem;
-    }
+/* Range slider */
+.range-wrap{margin-top:.4rem}
+.range-row{display:flex;gap:.5rem;align-items:center;margin-bottom:.3rem}
+.range-val{
+  background:var(--bg);border:1px solid var(--border);border-radius:4px;
+  color:var(--text);font-size:.7rem;padding:.2rem .4rem;width:62px;text-align:center
+}
+.range-between{color:var(--muted);font-size:.7rem;flex-shrink:0}
+.range-track{position:relative;height:4px;background:var(--border);border-radius:4px;margin:.5rem 0}
+.range-fill{position:absolute;height:100%;background:var(--accent);border-radius:4px}
+.dual-range{position:relative;height:20px;margin:-8px 0}
+.dual-range input[type=range]{
+  position:absolute;width:100%;height:100%;
+  -webkit-appearance:none;appearance:none;
+  background:transparent;pointer-events:none;
+}
+.dual-range input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:14px;height:14px;border-radius:50%;
+  background:var(--accent);cursor:pointer;pointer-events:all;
+  border:2px solid var(--surface);transition:transform .1s
+}
+.dual-range input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+.dual-range input[type=range]::-moz-range-thumb{
+  width:14px;height:14px;border-radius:50%;
+  background:var(--accent);cursor:pointer;pointer-events:all;
+  border:2px solid var(--surface)
+}
+.single-range{width:100%;-webkit-appearance:none;appearance:none;
+  height:4px;background:var(--border);border-radius:4px;outline:none}
+.single-range::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--surface)
+}
 
-    .chart-wrap {
-      position: relative;
-      flex: 1;
-      min-height: 280px;
-    }
-    .chart-wrap.tall { min-height: 360px; }
-    .chart-wrap.scatter { min-height: 420px; }
+/* ── Main content ── */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;padding:1rem;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border)}
 
-    /* ── Legend pills ── */
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: .5rem;
-      margin-top: 1rem;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: .35rem;
-      font-size: .72rem;
-      color: var(--muted);
-    }
-    .legend-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
+/* KPI row */
+.kpi-row{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:1rem}
+.kpi{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:.7rem 1rem;flex:1;min-width:120px;
+}
+.kpi .kv{font-size:1.3rem;font-weight:700;color:var(--accent2)}
+.kpi .kl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:.15rem}
 
-    /* ── Insight box ── */
-    .insight {
-      background: #818cf810;
-      border-left: 3px solid var(--accent);
-      border-radius: 0 6px 6px 0;
-      padding: .6rem .9rem;
-      font-size: .78rem;
-      color: var(--muted);
-      margin-top: .9rem;
-    }
-    .insight strong { color: #a5b4fc; }
+/* Chart grid */
+.grid{display:grid;gap:.9rem;
+  grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:1rem 1.1rem;display:flex;flex-direction:column
+}
+.card.wide{grid-column:1/-1}
+.card-head{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:.8rem;gap:.5rem
+}
+.card-title{font-size:.65rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--muted)}
+.card-title span{display:block;font-size:.85rem;text-transform:none;
+  letter-spacing:0;color:var(--text);font-weight:600;margin-top:.1rem}
+.card-controls{display:flex;gap:.4rem;flex-wrap:wrap;align-items:flex-start;flex-shrink:0}
 
-    footer {
-      text-align: center;
-      padding: 1.5rem;
-      font-size: .72rem;
-      color: #3a4055;
-      border-top: 1px solid var(--border);
-    }
+/* Select dropdowns in cards */
+.ctrl-select{
+  background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  color:var(--muted2);font-size:.68rem;padding:.2rem .5rem;cursor:pointer;outline:none;
+  transition:border-color .15s
+}
+.ctrl-select:hover,.ctrl-select:focus{border-color:var(--accent)}
 
-    #loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 60vh;
-      font-size: 1.1rem;
-      color: var(--muted);
-    }
-    #app { display: none; }
-  </style>
+/* Segmented control */
+.segmented{display:flex;background:var(--bg);border-radius:6px;border:1px solid var(--border)}
+.seg-btn{
+  border:none;background:none;color:var(--muted);font-size:.68rem;padding:.25rem .55rem;
+  cursor:pointer;transition:all .15s;border-radius:5px
+}
+.seg-btn.active{background:var(--surface2);color:var(--text);font-weight:600}
+
+/* Chart wrap */
+.chart-wrap{position:relative;flex:1;min-height:240px}
+.chart-wrap.tall{min-height:320px}
+
+/* Insight */
+.insight{
+  background:var(--accent)0d;border-left:2px solid var(--accent);
+  border-radius:0 6px 6px 0;padding:.45rem .7rem;font-size:.72rem;
+  color:var(--muted2);margin-top:.8rem;line-height:1.5
+}
+.insight b{color:var(--accent2)}
+
+/* Legend */
+.leg{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.6rem}
+.leg-item{display:flex;align-items:center;gap:.3rem;font-size:.68rem;color:var(--muted2)}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+
+/* Empty state */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:200px;color:var(--muted);font-size:.8rem;gap:.5rem
+}
+.empty-state .icon{font-size:2rem;opacity:.3}
+
+/* Loading */
+#loading{
+  display:flex;align-items:center;justify-content:center;
+  height:100vh;font-size:.95rem;color:var(--muted);gap:.7rem
+}
+#app{display:none;flex-direction:column;height:100vh;overflow:hidden}
+</style>
 </head>
 <body>
 
-<div id="loading">Loading data…</div>
+<div id="loading">⏳ Loading dashboard…</div>
 
 <div id="app">
-  <header>
-    <h1>The Storage Buyer's Market: What You're Really Paying For</h1>
-    <p>A data-driven look at 607 Amazon storage listings — comparing price, speed, and value
-       across HDDs, SSDs, portable drives, and tape cartridges.</p>
-  </header>
 
-  <div class="kpi-row" id="kpi-row"></div>
-
-  <div class="story">
-    Every buyer faces the same question: <em>which storage gives me the most for my money?</em>
-    This dashboard cuts through the noise to reveal the real price-performance story.
+  <!-- Top bar -->
+  <div class="topbar">
+    <div>
+      <h1>Storage Market Dashboard</h1>
+      <div class="subtitle">607 Amazon drive listings · Price · Speed · Value</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="count-badge">Showing <span id="count-shown">–</span> of <span id="count-total">–</span> drives</div>
+    <button class="btn-reset" id="btn-reset">↺ Reset Filters</button>
   </div>
 
-  <div class="grid">
-
-    <!-- 1  Market breakdown -->
-    <div class="card">
-      <div class="card-title">Market Overview<span>Drive Type Distribution</span></div>
-      <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
-      <div class="insight">
-        <strong>Portable HDDs</strong> dominate with 40% of listings, but
-        <strong>SSDs</strong> (32%) are closing the gap fast.
-      </div>
-    </div>
-
-    <!-- 2  Price per TB -->
-    <div class="card">
-      <div class="card-title">Cost Analysis<span>Median Price per TB by Drive Type</span></div>
-      <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
-      <div class="insight">
-        Tape is the cheapest per-TB option at <strong>~$9.66/TB</strong>, but
-        SSDs and HDDs trade blows near <strong>$22–$26/TB</strong>.
-      </div>
-    </div>
-
-    <!-- 3  Speed vs Price scatter -->
-    <div class="card wide">
-      <div class="card-title">Performance vs Cost<span>Read Speed (MB/s) vs Price per TB — colored by drive type</span></div>
-      <div class="chart-wrap scatter"><canvas id="scatterChart"></canvas></div>
-      <div class="legend" id="scatter-legend"></div>
-      <div class="insight">
-        <strong>SSDs</strong> cluster in the 500–7000 MB/s band at comparable prices to HDDs.
-        <strong>HDDs</strong> show wide speed variance due to mixed RPM ratings in the dataset.
-        Portable drives sit low-and-left: cheap but slow.
-      </div>
-    </div>
-
-    <!-- 4  Speed comparison bar -->
-    <div class="card">
-      <div class="card-title">Speed Benchmark<span>Average Read Speed by Drive Type (MB/s)</span></div>
-      <div class="chart-wrap"><canvas id="speedChart"></canvas></div>
-      <div class="insight">
-        <strong>SSDs</strong> average <strong>724 MB/s</strong> read — nearly 4× a portable HDD's
-        197 MB/s. For workloads that need throughput, the SSD premium is justified.
-      </div>
-    </div>
-
-    <!-- 5  New vs Used -->
-    <div class="card">
-      <div class="card-title">Condition Market<span>New vs Used — Count & Avg Price per TB</span></div>
-      <div class="chart-wrap"><canvas id="conditionChart"></canvas></div>
-      <div class="insight">
-        The market is nearly split 50/50 between <strong>new and used</strong> drives.
-        Buying used can cut your cost-per-TB significantly — worth considering for bulk storage.
-      </div>
-    </div>
-
-    <!-- 6  Top brands -->
-    <div class="card">
-      <div class="card-title">Brand Landscape<span>Top 8 Brands by Listing Count</span></div>
-      <div class="chart-wrap tall"><canvas id="brandChart"></canvas></div>
-      <div class="insight">
-        <strong>Seagate</strong> leads among named brands with 54 listings.
-        A large share of listings (409) have no identified brand — a quality-signal gap for buyers.
-      </div>
-    </div>
-
-    <!-- 7  Capacity histogram -->
-    <div class="card">
-      <div class="card-title">Capacity Distribution<span>How Many Drives Are Available at Each Size?</span></div>
-      <div class="chart-wrap"><canvas id="capChart"></canvas></div>
-      <div class="insight">
-        The sweet spot for supply is <strong>1–4 TB</strong> — the most competition means
-        the best pricing for everyday buyers.
-      </div>
-    </div>
-
-    <!-- 8  Ratings -->
-    <div class="card">
-      <div class="card-title">Buyer Satisfaction<span>Average Rating by Drive Type</span></div>
-      <div class="chart-wrap"><canvas id="ratingChart"></canvas></div>
-      <div class="insight">
-        All categories hover between <strong>4.0–4.6 ★</strong>, suggesting buyers are
-        generally satisfied regardless of type. Ratings alone won't differentiate your choice.
-      </div>
-    </div>
-
+  <!-- Active filter pills -->
+  <div class="pills-row" id="pills-row">
+    <span class="pills-empty" id="pills-empty">No active filters</span>
   </div>
 
-  <footer>
-    Data: 607 Amazon storage listings · Visualization: Homework P2 — Big Data Engineering, WVU
-  </footer>
-</div>
+  <!-- Body -->
+  <div class="body-layout">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">Filters</div>
+
+      <!-- Drive Type -->
+      <div class="filter-section">
+        <span class="filter-label">Drive Type</span>
+        <div class="type-pills" id="type-pills">
+          <button class="type-pill" data-type="HDD">HDD</button>
+          <button class="type-pill" data-type="SSD">SSD</button>
+          <button class="type-pill" data-type="Portable HDD">Port. HDD</button>
+          <button class="type-pill" data-type="Portable SSD">Port. SSD</button>
+          <button class="type-pill" data-type="Tape Cartridge">Tape</button>
+          <button class="type-pill" data-type="other">Other</button>
+        </div>
+      </div>
+
+      <!-- Condition -->
+      <div class="filter-section">
+        <span class="filter-label">Condition</span>
+        <div class="radio-tabs">
+          <button class="radio-tab active" data-cond="all">All</button>
+          <button class="radio-tab" data-cond="new">New</button>
+          <button class="radio-tab" data-cond="used">Used</button>
+        </div>
+      </div>
+
+      <!-- Toggles -->
+      <div class="filter-section">
+        <span class="filter-label">Availability</span>
+        <div class="toggle-row">
+          <span class="toggle-label">In-Stock Only</span>
+          <label class="toggle"><input type="checkbox" id="tog-stock"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Prime Eligible Only</span>
+          <label class="toggle"><input type="checkbox" id="tog-prime"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+
+      <!-- Price/TB -->
+      <div class="filter-section">
+        <span class="filter-label">Price per TB</span>
+        <div class="range-row">
+          <input class="range-val" id="pptb-min-val" value="$5" readonly>
+          <span class="range-between">–</span>
+          <input class="range-val" id="pptb-max-val" value="$38" readonly>
+        </div>
+        <div class="range-track">
+          <div class="range-fill" id="pptb-fill"></div>
+        </div>
+        <div class="dual-range">
+          <input type="range" id="pptb-min" min="4" max="39" step="0.5" value="4">
+          <input type="range" id="pptb-max" min="4" max="39" step="0.5" value="39">
+        </div>
+      </div>
+
+      <!-- Capacity -->
+      <div class="filter-section">
+        <span class="filter-label">Capacity (TB)</span>
+        <div class="range-row">
+          <input class="range-val" id="cap-min-val" value="0" readonly>
+          <span class="range-between">–</span>
+          <input class="range-val" id="cap-max-val" value="30" readonly>
+        </div>
+        <div class="range-track">
+          <div class="range-fill" id="cap-fill"></div>
+        </div>
+        <div class="dual-range">
+          <input type="range" id="cap-min" min="0" max="30" step="0.5" value="0">
+          <input type="range" id="cap-max" min="0" max="30" step="0.5" value="30">
+        </div>
+      </div>
+
+      <!-- Read Speed -->
+      <div class="filter-section">
+        <span class="filter-label">Read Speed (MB/s)</span>
+        <div class="range-row">
+          <input class="range-val" id="spd-min-val" value="0" readonly>
+          <span class="range-between">–</span>
+          <input class="range-val" id="spd-max-val" value="7200" readonly>
+        </div>
+        <div class="range-track">
+          <div class="range-fill" id="spd-fill"></div>
+        </div>
+        <div class="dual-range">
+          <input type="range" id="spd-min" min="0" max="7200" step="100" value="0">
+          <input type="range" id="spd-max" min="0" max="7200" step="100" value="7200">
+        </div>
+      </div>
+
+      <!-- Min Rating -->
+      <div class="filter-section">
+        <span class="filter-label">Min Rating: <span id="rating-label">0 ★</span></span>
+        <input type="range" class="single-range" id="min-rating" min="0" max="5" step="0.5" value="0">
+      </div>
+
+      <!-- Top N brands (for brand chart) -->
+      <div class="filter-section">
+        <span class="filter-label">Brand Chart: Top <span id="topn-label">10</span></span>
+        <input type="range" class="single-range" id="topn" min="3" max="20" step="1" value="10">
+      </div>
+
+    </div><!-- /sidebar -->
+
+    <!-- Main -->
+    <div class="main">
+
+      <!-- KPI -->
+      <div class="kpi-row">
+        <div class="kpi"><div class="kv" id="kv-count">–</div><div class="kl">Drives</div></div>
+        <div class="kpi"><div class="kv" id="kv-pptb">–</div><div class="kl">Median $/TB</div></div>
+        <div class="kpi"><div class="kv" id="kv-price">–</div><div class="kl">Price Range</div></div>
+        <div class="kpi"><div class="kv" id="kv-rating">–</div><div class="kl">Avg Rating</div></div>
+        <div class="kpi"><div class="kv" id="kv-speed">–</div><div class="kl">Avg Read MB/s</div></div>
+        <div class="kpi"><div class="kv" id="kv-brands">–</div><div class="kl">Named Brands</div></div>
+      </div>
+
+      <!-- Charts grid -->
+      <div class="grid">
+
+        <!-- Scatter (wide) -->
+        <div class="card wide">
+          <div class="card-head">
+            <div class="card-title">Explore<span id="scatter-title">Price/TB vs Read Speed</span></div>
+            <div class="card-controls">
+              <select class="ctrl-select" id="scatter-x">
+                <option value="pptb">X: Price/TB ($)</option>
+                <option value="price">X: Price ($)</option>
+                <option value="cap">X: Capacity (TB)</option>
+                <option value="speed_r">X: Read Speed</option>
+                <option value="speed_w">X: Write Speed</option>
+                <option value="rating">X: Rating (★)</option>
+                <option value="reviews">X: Reviews</option>
+              </select>
+              <select class="ctrl-select" id="scatter-y">
+                <option value="speed_r" selected>Y: Read Speed</option>
+                <option value="pptb">Y: Price/TB ($)</option>
+                <option value="price">Y: Price ($)</option>
+                <option value="cap">Y: Capacity (TB)</option>
+                <option value="speed_w">Y: Write Speed</option>
+                <option value="rating">Y: Rating (★)</option>
+                <option value="reviews">Y: Reviews</option>
+              </select>
+              <select class="ctrl-select" id="scatter-color">
+                <option value="drive_type">Color: Drive Type</option>
+                <option value="Condition">Color: Condition</option>
+                <option value="in_stock">Color: Stock</option>
+              </select>
+            </div>
+          </div>
+          <div class="chart-wrap tall"><canvas id="scatterChart"></canvas></div>
+          <div class="leg" id="scatter-leg"></div>
+        </div>
+
+        <!-- Donut -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Market Share<span>Drive Type Distribution</span></div>
+          </div>
+          <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
+          <div class="insight"><b>Tip:</b> Click a segment to filter by that drive type.</div>
+        </div>
+
+        <!-- Price/TB -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Cost per TB<span>By Drive Type</span></div>
+            <div class="card-controls">
+              <div class="segmented">
+                <button class="seg-btn active" data-price-metric="median">Median</button>
+                <button class="seg-btn" data-price-metric="mean">Mean</button>
+                <button class="seg-btn" data-price-metric="min">Min</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+        </div>
+
+        <!-- Speed -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Speed Benchmark<span>By Drive Type (MB/s)</span></div>
+            <div class="card-controls">
+              <div class="segmented">
+                <button class="seg-btn active" data-speed-mode="read">Read</button>
+                <button class="seg-btn" data-speed-mode="write">Write</button>
+                <button class="seg-btn" data-speed-mode="both">Both</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="speedChart"></canvas></div>
+        </div>
+
+        <!-- Condition -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">New vs Used<span>Count &amp; Median $/TB</span></div>
+          </div>
+          <div class="chart-wrap"><canvas id="condChart"></canvas></div>
+        </div>
+
+        <!-- Capacity histogram -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Supply by Size<span>Capacity Distribution</span></div>
+          </div>
+          <div class="chart-wrap"><canvas id="capChart"></canvas></div>
+        </div>
+
+        <!-- Brand -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Brand Landscape<span>Listings by Manufacturer</span></div>
+          </div>
+          <div class="chart-wrap tall"><canvas id="brandChart"></canvas></div>
+        </div>
+
+        <!-- Rating -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Buyer Satisfaction<span>Avg Rating by Drive Type</span></div>
+          </div>
+          <div class="chart-wrap"><canvas id="ratingChart"></canvas></div>
+        </div>
+
+      </div><!-- /grid -->
+    </div><!-- /main -->
+  </div><!-- /body-layout -->
+</div><!-- /app -->
 
 <script>
+// ═══════════════════════════════════════════════════════
+//  CONSTANTS & HELPERS
+// ═══════════════════════════════════════════════════════
 const TYPE_COLORS = {
-  'HDD':              '#3b82f6',
-  'SSD':              '#10b981',
-  'Portable HDD':     '#f59e0b',
-  'Portable SSD':     '#ec4899',
-  'Tape Cartridge':   '#8b5cf6',
-  'LTO Tape Cartridge':'#a78bfa',
-  'Data Cartridge':   '#c084fc',
-  'Tape Drive':       '#7c3aed',
-  'Hybrid':           '#06b6d4',
-  'Other':            '#64748b',
+  'HDD':'#3b82f6','SSD':'#10b981','Portable HDD':'#f59e0b',
+  'Portable SSD':'#ec4899','Tape Cartridge':'#8b5cf6',
+  'LTO Tape Cartridge':'#a78bfa','Data Cartridge':'#c084fc',
+  'Tape Drive':'#7c3aed','Hybrid':'#06b6d4','':'#64748b'
 };
+const COND_COLORS = {'New':'#3b82f6','Used':'#f59e0b','':'#64748b'};
+const STOCK_COLORS = {'true':'#10b981','yes':'#10b981','limited':'#f59e0b','false':'#ef4444','unknown':'#64748b'};
+const MAIN_TYPES = ['HDD','SSD','Portable HDD','Portable SSD','Tape Cartridge'];
 
-function typeColor(t) { return TYPE_COLORS[t] || '#64748b'; }
+function tc(t){ return TYPE_COLORS[t]||'#64748b' }
+function parsePrice(s){ const n=parseFloat(String(s||'').replace(/[$,]/g,'')); return isNaN(n)?null:n }
+function median(a){ if(!a.length)return null; const s=[...a].sort((x,y)=>x-y),m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2 }
+function mean(a){ return a.length?a.reduce((s,v)=>s+v,0)/a.length:null }
+function safeFloat(v){ const n=parseFloat(v); return isNaN(n)?null:n }
 
-function parsePrice(s) {
-  if (!s) return null;
-  const n = parseFloat(String(s).replace(/[$,]/g, ''));
-  return isNaN(n) ? null : n;
+function isInStock(r){
+  const s=String(r.in_stock||'').toLowerCase();
+  return s==='true'||s==='yes'||s==='limited';
+}
+function isPrime(r){
+  const p=String(r.prime_eligible||'').toLowerCase();
+  return p==='true'||p==='yes';
 }
 
-function median(arr) {
-  if (!arr.length) return 0;
-  const s = [...arr].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-
-function avg(arr) {
-  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-}
-
-const CHART_DEFAULTS = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: { backgroundColor: '#1e2235', titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10 },
-  },
+const FIELD_LABELS = {
+  pptb:'Price/TB ($)',price:'Price ($)',cap:'Capacity (TB)',
+  speed_r:'Read Speed (MB/s)',speed_w:'Write Speed (MB/s)',rating:'Rating (★)',reviews:'Reviews'
 };
+function fieldVal(r, key){
+  if(key==='pptb') return parsePrice(r['Price per TB']);
+  if(key==='price') return parsePrice(r['Price']);
+  if(key==='cap') return typeof r.Capacity==='number'?r.Capacity:null;
+  if(key==='speed_r') return safeFloat(r.read_speed_mbps);
+  if(key==='speed_w') return safeFloat(r.write_speed_mbps);
+  if(key==='rating') return safeFloat(r.average_rating);
+  if(key==='reviews') return safeFloat(r.total_no_of_reviews);
+}
 
-function axisStyle(title) {
+const CHART_OPTS = {
+  responsive:true,maintainAspectRatio:false,
+  animation:{duration:300},
+  plugins:{
+    legend:{display:false},
+    tooltip:{backgroundColor:'#1e2235',titleColor:'#e2e8f0',bodyColor:'#94a3b8',padding:10,cornerRadius:8}
+  }
+};
+function axisStyle(title){
   return {
-    grid: { color: '#2a2d3e' },
-    ticks: { color: '#64748b', font: { size: 11 } },
-    title: title ? { display: true, text: title, color: '#64748b', font: { size: 11 } } : undefined,
+    grid:{color:'#252a3d'},
+    ticks:{color:'#64748b',font:{size:10}},
+    title:title?{display:true,text:title,color:'#64748b',font:{size:10}}:undefined
   };
 }
+function groupBy(arr,fn){ const m={}; arr.forEach(r=>{const k=fn(r);(m[k]=m[k]||[]).push(r)}); return m }
 
-// ── Main ───────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let RAW = [];
+let filtered = [];
+const charts = {};
+
+const state = {
+  driveTypes: new Set(),   // empty = all
+  condition: 'all',
+  inStock: false,
+  prime: false,
+  pptb: { min:4, max:39 },
+  cap:  { min:0, max:30 },
+  spd:  { min:0, max:7200 },
+  minRating: 0,
+  topN: 10,
+  priceMetric: 'median',
+  speedMode: 'read',
+  scatterX: 'pptb',
+  scatterY: 'speed_r',
+  scatterColor: 'drive_type',
+};
+
+// ═══════════════════════════════════════════════════════
+//  FILTER ENGINE
+// ═══════════════════════════════════════════════════════
+function applyFilters(){
+  const OTHER = ['LTO Tape Cartridge','Data Cartridge','Tape Drive','Hybrid',''];
+  filtered = RAW.filter(r=>{
+    // Drive type
+    if(state.driveTypes.size){
+      const t = r.drive_type||'';
+      const bucket = OTHER.includes(t)?'other':t;
+      if(!state.driveTypes.has(bucket)) return false;
+    }
+    // Condition
+    if(state.condition!=='all'){
+      if((r.Condition||'').toLowerCase()!==state.condition) return false;
+    }
+    // In stock
+    if(state.inStock && !isInStock(r)) return false;
+    // Prime
+    if(state.prime && !isPrime(r)) return false;
+    // Price/TB
+    const pptb=parsePrice(r['Price per TB']);
+    if(pptb!==null && (pptb<state.pptb.min||pptb>state.pptb.max)) return false;
+    // Capacity
+    const cap=typeof r.Capacity==='number'?r.Capacity:null;
+    if(cap!==null && (cap<state.cap.min||cap>state.cap.max)) return false;
+    // Speed
+    const spd=safeFloat(r.read_speed_mbps);
+    if(spd!==null && spd>0 && (spd<state.spd.min||spd>state.spd.max)) return false;
+    // Rating
+    const rat=safeFloat(r.average_rating);
+    if(rat!==null && rat>0 && rat<state.minRating) return false;
+    return true;
+  });
+
+  updateCountBadge();
+  updateKPIs();
+  updatePills();
+  updateAllCharts();
+}
+
+// ═══════════════════════════════════════════════════════
+//  KPI + PILLS + BADGE
+// ═══════════════════════════════════════════════════════
+function updateCountBadge(){
+  document.getElementById('count-shown').textContent=filtered.length;
+  document.getElementById('count-total').textContent=RAW.length;
+  document.getElementById('kv-count').textContent=filtered.length;
+}
+
+function updateKPIs(){
+  const pptbs=filtered.map(r=>parsePrice(r['Price per TB'])).filter(Boolean);
+  const prices=filtered.map(r=>parsePrice(r['Price'])).filter(Boolean);
+  const rats=filtered.map(r=>safeFloat(r.average_rating)).filter(n=>n&&n>0);
+  const spds=filtered.map(r=>safeFloat(r.read_speed_mbps)).filter(n=>n&&n>0);
+  const brands=new Set(filtered.map(r=>r.brand).filter(b=>b&&b!=='Unknown'));
+
+  const med=median(pptbs);
+  document.getElementById('kv-pptb').textContent=med?'$'+med.toFixed(2):'–';
+  const mn=prices.length?Math.min(...prices):0,mx=prices.length?Math.max(...prices):0;
+  document.getElementById('kv-price').textContent=prices.length?'$'+mn.toFixed(0)+'–$'+mx.toFixed(0):'–';
+  const avgR=rats.length?rats.reduce((a,b)=>a+b,0)/rats.length:0;
+  document.getElementById('kv-rating').textContent=avgR?avgR.toFixed(1)+' ★':'–';
+  const avgS=spds.length?spds.reduce((a,b)=>a+b,0)/spds.length:0;
+  document.getElementById('kv-speed').textContent=avgS?Math.round(avgS):'–';
+  document.getElementById('kv-brands').textContent=brands.size;
+}
+
+function updatePills(){
+  const pills=[];
+  if(state.driveTypes.size) state.driveTypes.forEach(t=>pills.push({key:'type:'+t,label:t}));
+  if(state.condition!=='all') pills.push({key:'cond',label:'Condition: '+state.condition});
+  if(state.inStock) pills.push({key:'stock',label:'In-Stock'});
+  if(state.prime)   pills.push({key:'prime',label:'Prime'});
+  if(state.pptb.min>4||state.pptb.max<39) pills.push({key:'pptb',label:'$'+state.pptb.min+'–$'+state.pptb.max+'/TB'});
+  if(state.cap.min>0||state.cap.max<30) pills.push({key:'cap',label:state.cap.min+'–'+state.cap.max+' TB'});
+  if(state.spd.min>0||state.spd.max<7200) pills.push({key:'spd',label:state.spd.min+'–'+state.spd.max+' MB/s'});
+  if(state.minRating>0) pills.push({key:'rat',label:'★ ≥ '+state.minRating});
+
+  const row=document.getElementById('pills-row');
+  row.innerHTML='';
+  if(!pills.length){
+    row.innerHTML='<span class="pills-empty">No active filters</span>';
+    return;
+  }
+  pills.forEach(p=>{
+    const el=document.createElement('div');
+    el.className='pill';
+    el.innerHTML=`${p.label}<button title="Remove" data-pkey="${p.key}">✕</button>`;
+    el.querySelector('button').addEventListener('click',()=>removePill(p.key));
+    row.appendChild(el);
+  });
+}
+
+function removePill(key){
+  if(key.startsWith('type:')){
+    const t=key.slice(5);
+    state.driveTypes.delete(t);
+    document.querySelector(`.type-pill[data-type="${t}"]`)?.classList.remove('active');
+  } else if(key==='cond'){
+    state.condition='all';
+    document.querySelectorAll('.radio-tab').forEach(b=>{
+      b.classList.toggle('active',b.dataset.cond==='all');
+    });
+  } else if(key==='stock'){
+    state.inStock=false;
+    document.getElementById('tog-stock').checked=false;
+  } else if(key==='prime'){
+    state.prime=false;
+    document.getElementById('tog-prime').checked=false;
+  } else if(key==='pptb'){
+    state.pptb={min:4,max:39};
+    document.getElementById('pptb-min').value=4;
+    document.getElementById('pptb-max').value=39;
+    updateRangeUI('pptb',4,39,4,39,'$','');
+  } else if(key==='cap'){
+    state.cap={min:0,max:30};
+    document.getElementById('cap-min').value=0;
+    document.getElementById('cap-max').value=30;
+    updateRangeUI('cap',0,30,0,30,'','TB');
+  } else if(key==='spd'){
+    state.spd={min:0,max:7200};
+    document.getElementById('spd-min').value=0;
+    document.getElementById('spd-max').value=7200;
+    updateRangeUI('spd',0,7200,0,7200,'','');
+  } else if(key==='rat'){
+    state.minRating=0;
+    document.getElementById('min-rating').value=0;
+    document.getElementById('rating-label').textContent='0 ★';
+  }
+  applyFilters();
+}
+
+// ═══════════════════════════════════════════════════════
+//  RANGE SLIDER HELPERS
+// ═══════════════════════════════════════════════════════
+function updateRangeUI(id,mn,mx,rMin,rMax,prefix,suffix){
+  const lo=Math.min(mn,mx), hi=Math.max(mn,mx);
+  const pct1=((lo-rMin)/(rMax-rMin))*100;
+  const pct2=((hi-rMin)/(rMax-rMin))*100;
+  const fill=document.getElementById(id+'-fill');
+  if(fill){ fill.style.left=pct1+'%'; fill.style.width=(pct2-pct1)+'%'; }
+  const minEl=document.getElementById(id+'-min-val');
+  const maxEl=document.getElementById(id+'-max-val');
+  if(minEl) minEl.value=prefix+lo+suffix;
+  if(maxEl) maxEl.value=prefix+hi+suffix;
+}
+
+function bindDualRange(id,rMin,rMax,prefix,suffix,onChange){
+  const minEl=document.getElementById(id+'-min');
+  const maxEl=document.getElementById(id+'-max');
+  function sync(){
+    let lo=parseFloat(minEl.value), hi=parseFloat(maxEl.value);
+    if(lo>hi){ const t=lo;lo=hi;hi=t; }
+    updateRangeUI(id,lo,hi,rMin,rMax,prefix,suffix);
+    onChange(lo,hi);
+  }
+  minEl.addEventListener('input',sync);
+  maxEl.addEventListener('input',sync);
+  updateRangeUI(id,rMin,rMax,rMin,rMax,prefix,suffix);
+}
+
+// ═══════════════════════════════════════════════════════
+//  CHART BUILDER UTILITIES
+// ═══════════════════════════════════════════════════════
+function destroyChart(key){
+  if(charts[key]){ charts[key].destroy(); delete charts[key]; }
+}
+
+function buildDonut(){
+  destroyChart('donut');
+  const byType=groupBy(filtered,r=>r.drive_type||'');
+  const types=Object.keys(byType).sort((a,b)=>byType[b].length-byType[a].length);
+  if(!types.length){ showEmpty('donutChart'); return; }
+  charts['donut']=new Chart(document.getElementById('donutChart'),{
+    type:'doughnut',
+    data:{
+      labels:types,
+      datasets:[{
+        data:types.map(t=>byType[t].length),
+        backgroundColor:types.map(t=>tc(t)+'cc'),
+        borderColor:'#161925',borderWidth:3,hoverOffset:10
+      }]
+    },
+    options:{
+      ...CHART_OPTS,cutout:'62%',
+      plugins:{
+        ...CHART_OPTS.plugins,
+        legend:{display:true,position:'right',
+          labels:{color:'#94a3b8',font:{size:10},boxWidth:10,padding:8}},
+        tooltip:{
+          ...CHART_OPTS.plugins.tooltip,
+          callbacks:{label:ctx=>{
+            const total=types.reduce((s,t)=>s+byType[t].length,0);
+            return ` ${ctx.label}: ${ctx.parsed} (${(ctx.parsed/total*100).toFixed(1)}%)`;
+          }}
+        }
+      },
+      onClick(_,els){
+        if(!els.length) return;
+        const t=types[els[0].index];
+        const OTHER=['LTO Tape Cartridge','Data Cartridge','Tape Drive','Hybrid',''];
+        const bucket=OTHER.includes(t)?'other':t;
+        if(state.driveTypes.has(bucket)) state.driveTypes.delete(bucket);
+        else state.driveTypes.add(bucket);
+        document.querySelector(`.type-pill[data-type="${bucket}"]`)?.classList.toggle('active',state.driveTypes.has(bucket));
+        applyFilters();
+      }
+    }
+  });
+}
+
+function buildPrice(){
+  destroyChart('price');
+  const byType=groupBy(filtered,r=>r.drive_type||'');
+  const metric = state.priceMetric;
+  const rows=Object.entries(byType).map(([t,recs])=>{
+    const prices=recs.map(r=>parsePrice(r['Price per TB'])).filter(Boolean);
+    const val=metric==='median'?median(prices):metric==='mean'?mean(prices):prices.length?Math.min(...prices):null;
+    return {t,val,n:prices.length};
+  }).filter(d=>d.val&&d.n>1).sort((a,b)=>a.val-b.val);
+
+  if(!rows.length){ showEmpty('priceChart'); return; }
+  charts['price']=new Chart(document.getElementById('priceChart'),{
+    type:'bar',
+    data:{
+      labels:rows.map(d=>d.t),
+      datasets:[{
+        data:rows.map(d=>+d.val.toFixed(2)),
+        backgroundColor:rows.map(d=>tc(d.t)+'bb'),
+        borderColor:rows.map(d=>tc(d.t)),
+        borderWidth:1,borderRadius:5
+      }]
+    },
+    options:{
+      ...CHART_OPTS,indexAxis:'y',
+      scales:{
+        x:{...axisStyle('$/TB'),beginAtZero:true},
+        y:axisStyle()
+      },
+      plugins:{...CHART_OPTS.plugins,
+        tooltip:{...CHART_OPTS.plugins.tooltip,
+          callbacks:{label:ctx=>` $${ctx.parsed.x.toFixed(2)}/TB (n=${rows[ctx.dataIndex].n})`}
+        }
+      }
+    }
+  });
+}
+
+function buildSpeed(){
+  destroyChart('speed');
+  const byType=groupBy(filtered,r=>r.drive_type||'');
+  const mode=state.speedMode;
+  const types=Object.keys(byType).sort((a,b)=>byType[b].length-byType[a].length);
+  if(!types.length){ showEmpty('speedChart'); return; }
+
+  const datasets=[];
+  if(mode==='read'||mode==='both'){
+    datasets.push({
+      label:'Read',
+      data:types.map(t=>{
+        const s=byType[t].map(r=>safeFloat(r.read_speed_mbps)).filter(n=>n&&n>0);
+        return s.length?Math.round(s.reduce((a,b)=>a+b,0)/s.length):0;
+      }),
+      backgroundColor:types.map(t=>tc(t)+'cc'),
+      borderColor:types.map(t=>tc(t)),
+      borderWidth:1,borderRadius:5,
+    });
+  }
+  if(mode==='write'||mode==='both'){
+    datasets.push({
+      label:'Write',
+      data:types.map(t=>{
+        const s=byType[t].map(r=>safeFloat(r.write_speed_mbps)).filter(n=>n&&n>0);
+        return s.length?Math.round(s.reduce((a,b)=>a+b,0)/s.length):0;
+      }),
+      backgroundColor:types.map(t=>tc(t)+'66'),
+      borderColor:types.map(t=>tc(t)),
+      borderWidth:1,borderRadius:5,
+      borderDash:[4,4],
+    });
+  }
+
+  charts['speed']=new Chart(document.getElementById('speedChart'),{
+    type:'bar',
+    data:{labels:types,datasets},
+    options:{
+      ...CHART_OPTS,
+      plugins:{...CHART_OPTS.plugins,
+        legend:{display:mode==='both',labels:{color:'#94a3b8',font:{size:10},boxWidth:10}}},
+      scales:{
+        x:axisStyle(),
+        y:{...axisStyle('MB/s'),beginAtZero:true}
+      }
+    }
+  });
+}
+
+function buildScatter(){
+  destroyChart('scatter');
+  const xk=state.scatterX, yk=state.scatterY, ck=state.scatterColor;
+  document.getElementById('scatter-title').textContent=
+    FIELD_LABELS[xk]+' vs '+FIELD_LABELS[yk];
+
+  // Color scheme
+  let colorMap={}, colorLabel=(v)=>v||'Unknown';
+  if(ck==='drive_type'){
+    colorMap=TYPE_COLORS; colorLabel=v=>v||'Unknown';
+  } else if(ck==='Condition'){
+    colorMap=COND_COLORS;
+  } else if(ck==='in_stock'){
+    colorMap=STOCK_COLORS; colorLabel=v=>String(v||'').toLowerCase();
+  }
+
+  // Build color groups
+  const groups={};
+  filtered.forEach(r=>{
+    const x=fieldVal(r,xk), y=fieldVal(r,yk);
+    if(x===null||y===null) return;
+    const cv=ck==='in_stock'?String(r[ck]||'').toLowerCase():r[ck]||'';
+    (groups[cv]=groups[cv]||[]).push({x,y,label:r.product_name||''});
+  });
+
+  const datasets=Object.entries(groups).map(([gk,pts])=>{
+    const col=colorMap[gk]||colorMap[colorLabel(gk)]||'#64748b';
+    return {
+      label:gk||'Unknown',
+      data:pts,
+      backgroundColor:col+'88',
+      borderColor:col,
+      borderWidth:1,
+      pointRadius:4,
+      pointHoverRadius:7,
+    };
+  });
+
+  // Build legend
+  const legEl=document.getElementById('scatter-leg');
+  legEl.innerHTML='';
+  datasets.forEach(ds=>{
+    legEl.insertAdjacentHTML('beforeend',
+      `<div class="leg-item"><div class="leg-dot" style="background:${ds.borderColor}"></div>${ds.label}</div>`);
+  });
+
+  if(!datasets.length){ showEmpty('scatterChart'); return; }
+
+  charts['scatter']=new Chart(document.getElementById('scatterChart'),{
+    type:'scatter',
+    data:{datasets},
+    options:{
+      ...CHART_OPTS,
+      scales:{
+        x:{...axisStyle(FIELD_LABELS[xk]),min:0},
+        y:{...axisStyle(FIELD_LABELS[yk]),min:0}
+      },
+      plugins:{...CHART_OPTS.plugins,
+        legend:{display:false},
+        tooltip:{...CHART_OPTS.plugins.tooltip,
+          callbacks:{
+            title:ctx=>ctx[0]?.raw?.label||'',
+            label:ctx=>`${FIELD_LABELS[xk]}: ${ctx.parsed.x.toFixed(2)}  |  ${FIELD_LABELS[yk]}: ${ctx.parsed.y.toFixed(2)}`
+          }
+        }
+      }
+    }
+  });
+}
+
+function buildCond(){
+  destroyChart('cond');
+  const newRec=filtered.filter(r=>(r.Condition||'').toLowerCase()==='new');
+  const usedRec=filtered.filter(r=>(r.Condition||'').toLowerCase()==='used');
+  const newP=newRec.map(r=>parsePrice(r['Price per TB'])).filter(Boolean);
+  const usedP=usedRec.map(r=>parsePrice(r['Price per TB'])).filter(Boolean);
+
+  charts['cond']=new Chart(document.getElementById('condChart'),{
+    type:'bar',
+    data:{
+      labels:['New','Used'],
+      datasets:[
+        {label:'Listings',data:[newRec.length,usedRec.length],
+          backgroundColor:['#3b82f6bb','#f59e0bbb'],borderColor:['#3b82f6','#f59e0b'],
+          borderWidth:1,borderRadius:5,yAxisID:'y'},
+        {label:'Median $/TB',data:[+(median(newP)||0).toFixed(2),+(median(usedP)||0).toFixed(2)],
+          backgroundColor:['#6366f1bb','#ec4899bb'],borderColor:['#6366f1','#ec4899'],
+          borderWidth:1,borderRadius:5,yAxisID:'y2'}
+      ]
+    },
+    options:{
+      ...CHART_OPTS,
+      plugins:{...CHART_OPTS.plugins,
+        legend:{display:true,labels:{color:'#94a3b8',font:{size:10},boxWidth:10}}},
+      scales:{
+        x:axisStyle(),
+        y:{...axisStyle('Listings'),beginAtZero:true,position:'left'},
+        y2:{...axisStyle('Median $/TB'),beginAtZero:true,position:'right',grid:{drawOnChartArea:false}}
+      }
+    }
+  });
+}
+
+function buildCap(){
+  destroyChart('cap');
+  const buckets=[
+    {l:'<0.5TB',mn:0,mx:0.5},{l:'0.5–1TB',mn:0.5,mx:1},
+    {l:'1–2TB',mn:1,mx:2},{l:'2–4TB',mn:2,mx:4},
+    {l:'4–8TB',mn:4,mx:8},{l:'8–16TB',mn:8,mx:16},{l:'16+TB',mn:16,mx:Infinity}
+  ];
+  const caps=filtered.map(r=>typeof r.Capacity==='number'?r.Capacity:null).filter(v=>v!==null);
+  const counts=buckets.map(b=>caps.filter(c=>c>=b.mn&&c<b.mx).length);
+  charts['cap']=new Chart(document.getElementById('capChart'),{
+    type:'bar',
+    data:{
+      labels:buckets.map(b=>b.l),
+      datasets:[{
+        data:counts,borderRadius:5,borderWidth:1,
+        backgroundColor:counts.map((_,i)=>`hsl(${200+i*18},65%,55%)bb`),
+        borderColor:counts.map((_,i)=>`hsl(${200+i*18},65%,55%)`)
+      }]
+    },
+    options:{
+      ...CHART_OPTS,
+      scales:{x:axisStyle('Capacity'),y:{...axisStyle('Count'),beginAtZero:true}}
+    }
+  });
+}
+
+function buildBrand(){
+  destroyChart('brand');
+  const cnt={};
+  filtered.forEach(r=>{const b=r.brand; if(b&&b!=='Unknown') cnt[b]=(cnt[b]||0)+1;});
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,state.topN);
+  if(!top.length){ showEmpty('brandChart'); return; }
+  charts['brand']=new Chart(document.getElementById('brandChart'),{
+    type:'bar',
+    data:{
+      labels:top.map(([b])=>b),
+      datasets:[{
+        data:top.map(([,n])=>n),
+        backgroundColor:'#6366f1bb',borderColor:'#6366f1',
+        borderWidth:1,borderRadius:5
+      }]
+    },
+    options:{
+      ...CHART_OPTS,indexAxis:'y',
+      scales:{x:{...axisStyle('Listings'),beginAtZero:true},y:axisStyle()}
+    }
+  });
+}
+
+function buildRating(){
+  destroyChart('rating');
+  const byType=groupBy(filtered,r=>r.drive_type||'');
+  const types=Object.keys(byType).sort((a,b)=>byType[b].length-byType[a].length);
+  const avgs=types.map(t=>{
+    const rs=byType[t].map(r=>safeFloat(r.average_rating)).filter(n=>n&&n>0);
+    return rs.length?rs.reduce((a,b)=>a+b,0)/rs.length:0;
+  });
+  charts['rating']=new Chart(document.getElementById('ratingChart'),{
+    type:'bar',
+    data:{
+      labels:types,
+      datasets:[{
+        data:avgs.map(v=>+v.toFixed(2)),
+        backgroundColor:types.map(t=>tc(t)+'bb'),
+        borderColor:types.map(t=>tc(t)),
+        borderWidth:1,borderRadius:5
+      }]
+    },
+    options:{
+      ...CHART_OPTS,
+      scales:{
+        x:axisStyle(),
+        y:{...axisStyle('Avg Rating'),min:3,max:5}
+      },
+      plugins:{...CHART_OPTS.plugins,
+        tooltip:{...CHART_OPTS.plugins.tooltip,
+          callbacks:{label:ctx=>` ${ctx.parsed.y.toFixed(2)} ★`}
+        }
+      }
+    }
+  });
+}
+
+function showEmpty(canvasId){
+  const canvas=document.getElementById(canvasId);
+  if(!canvas) return;
+  const parent=canvas.parentElement;
+  canvas.style.display='none';
+  if(!parent.querySelector('.empty-state')){
+    const div=document.createElement('div');
+    div.className='empty-state';
+    div.innerHTML='<div class="icon">📭</div><div>No data matches current filters</div>';
+    parent.appendChild(div);
+  }
+}
+
+function clearEmpty(canvasId){
+  const canvas=document.getElementById(canvasId);
+  if(!canvas) return;
+  canvas.style.display='';
+  canvas.parentElement.querySelector('.empty-state')?.remove();
+}
+
+function updateAllCharts(){
+  ['donutChart','priceChart','speedChart','scatterChart','condChart','capChart','brandChart','ratingChart']
+    .forEach(clearEmpty);
+  buildDonut();
+  buildPrice();
+  buildSpeed();
+  buildScatter();
+  buildCond();
+  buildCap();
+  buildBrand();
+  buildRating();
+}
+
+// ═══════════════════════════════════════════════════════
+//  WIRE UP CONTROLS
+// ═══════════════════════════════════════════════════════
+function wireControls(){
+  // Drive type pills
+  document.querySelectorAll('.type-pill').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const t=btn.dataset.type;
+      btn.classList.toggle('active');
+      if(btn.classList.contains('active')) state.driveTypes.add(t);
+      else state.driveTypes.delete(t);
+      applyFilters();
+    });
+  });
+
+  // Condition tabs
+  document.querySelectorAll('.radio-tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.radio-tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      state.condition=btn.dataset.cond;
+      applyFilters();
+    });
+  });
+
+  // Toggles
+  document.getElementById('tog-stock').addEventListener('change',e=>{
+    state.inStock=e.target.checked; applyFilters();
+  });
+  document.getElementById('tog-prime').addEventListener('change',e=>{
+    state.prime=e.target.checked; applyFilters();
+  });
+
+  // Dual range sliders
+  bindDualRange('pptb',4,39,'$','',
+    (lo,hi)=>{ state.pptb={min:lo,max:hi}; applyFilters(); });
+  bindDualRange('cap',0,30,'','TB',
+    (lo,hi)=>{ state.cap={min:lo,max:hi}; applyFilters(); });
+  bindDualRange('spd',0,7200,'','',
+    (lo,hi)=>{ state.spd={min:lo,max:hi}; applyFilters(); });
+
+  // Min rating
+  document.getElementById('min-rating').addEventListener('input',e=>{
+    state.minRating=parseFloat(e.target.value);
+    document.getElementById('rating-label').textContent=state.minRating+' ★';
+    applyFilters();
+  });
+
+  // Top N brands
+  document.getElementById('topn').addEventListener('input',e=>{
+    state.topN=parseInt(e.target.value);
+    document.getElementById('topn-label').textContent=state.topN;
+    buildBrand();
+  });
+
+  // Price metric segmented
+  document.querySelectorAll('[data-price-metric]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('[data-price-metric]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      state.priceMetric=btn.dataset.priceMetric;
+      buildPrice();
+    });
+  });
+
+  // Speed mode segmented
+  document.querySelectorAll('[data-speed-mode]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('[data-speed-mode]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      state.speedMode=btn.dataset.speedMode;
+      buildSpeed();
+    });
+  });
+
+  // Scatter dropdowns
+  document.getElementById('scatter-x').addEventListener('change',e=>{
+    state.scatterX=e.target.value; buildScatter();
+  });
+  document.getElementById('scatter-y').addEventListener('change',e=>{
+    state.scatterY=e.target.value; buildScatter();
+  });
+  document.getElementById('scatter-color').addEventListener('change',e=>{
+    state.scatterColor=e.target.value; buildScatter();
+  });
+
+  // Reset
+  document.getElementById('btn-reset').addEventListener('click',()=>{
+    state.driveTypes.clear();
+    state.condition='all';
+    state.inStock=false;
+    state.prime=false;
+    state.pptb={min:4,max:39};
+    state.cap={min:0,max:30};
+    state.spd={min:0,max:7200};
+    state.minRating=0;
+
+    document.querySelectorAll('.type-pill').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.radio-tab').forEach(b=>b.classList.toggle('active',b.dataset.cond==='all'));
+    document.getElementById('tog-stock').checked=false;
+    document.getElementById('tog-prime').checked=false;
+    document.getElementById('pptb-min').value=4;
+    document.getElementById('pptb-max').value=39;
+    document.getElementById('cap-min').value=0;
+    document.getElementById('cap-max').value=30;
+    document.getElementById('spd-min').value=0;
+    document.getElementById('spd-max').value=7200;
+    document.getElementById('min-rating').value=0;
+    document.getElementById('rating-label').textContent='0 ★';
+    updateRangeUI('pptb',4,39,4,39,'$','');
+    updateRangeUI('cap',0,30,0,30,'','TB');
+    updateRangeUI('spd',0,7200,0,7200,'','');
+    applyFilters();
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════
 fetch('data/data_v1.json')
-  .then(r => r.json())
-  .then(raw => {
-    const data = raw.filter(r => r.drive_type);
-
-    // ── KPI ──────────────────────────────────────────────────────────────
-    const allPptb = data.map(r => parsePrice(r['Price per TB'])).filter(Boolean);
-    const allPrices = data.map(r => parsePrice(r['Price'])).filter(Boolean);
-    const ratings = data.map(r => parseFloat(r.average_rating)).filter(n => !isNaN(n) && n > 0);
-
-    const kpis = [
-      { value: data.length,                           label: 'Listings' },
-      { value: '$' + median(allPptb).toFixed(2),      label: 'Median $/TB' },
-      { value: '$' + Math.min(...allPrices).toFixed(0) + '–$' + Math.max(...allPrices).toFixed(0), label: 'Price Range' },
-      { value: avg(ratings).toFixed(1) + ' ★',        label: 'Avg Rating' },
-      { value: [...new Set(data.map(r => r.brand).filter(b => b && b !== 'Unknown'))].length, label: 'Brands' },
-    ];
-    const kpiRow = document.getElementById('kpi-row');
-    kpis.forEach(k => {
-      kpiRow.insertAdjacentHTML('beforeend',
-        `<div class="kpi"><div class="value">${k.value}</div><div class="label">${k.label}</div></div>`);
-    });
-
-    // ── Group by drive type ───────────────────────────────────────────────
-    const byType = {};
-    data.forEach(r => {
-      const t = r.drive_type || 'Other';
-      (byType[t] = byType[t] || []).push(r);
-    });
-
-    // Sort types by count desc
-    const types = Object.keys(byType).sort((a, b) => byType[b].length - byType[a].length);
-    const mainTypes = types.slice(0, 6);
-
-    // ── 1  Donut ──────────────────────────────────────────────────────────
-    new Chart(document.getElementById('donutChart'), {
-      type: 'doughnut',
-      data: {
-        labels: types,
-        datasets: [{
-          data: types.map(t => byType[t].length),
-          backgroundColor: types.map(typeColor),
-          borderColor: '#1a1d27',
-          borderWidth: 3,
-          hoverOffset: 8,
-        }],
-      },
-      options: {
-        ...CHART_DEFAULTS,
-        cutout: '62%',
-        plugins: {
-          ...CHART_DEFAULTS.plugins,
-          legend: {
-            display: true,
-            position: 'right',
-            labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12, padding: 10 },
-          },
-        },
-      },
-    });
-
-    // ── 2  Price per TB bar ───────────────────────────────────────────────
-    const pptbByType = mainTypes.map(t => {
-      const prices = byType[t].map(r => parsePrice(r['Price per TB'])).filter(Boolean);
-      return { type: t, med: median(prices), n: prices.length };
-    }).filter(d => d.n > 1).sort((a, b) => a.med - b.med);
-
-    new Chart(document.getElementById('priceChart'), {
-      type: 'bar',
-      data: {
-        labels: pptbByType.map(d => d.type),
-        datasets: [{
-          data: pptbByType.map(d => +d.med.toFixed(2)),
-          backgroundColor: pptbByType.map(d => typeColor(d.type) + 'cc'),
-          borderColor:      pptbByType.map(d => typeColor(d.type)),
-          borderWidth: 1,
-          borderRadius: 6,
-        }],
-      },
-      options: {
-        ...CHART_DEFAULTS,
-        indexAxis: 'y',
-        scales: {
-          x: { ...axisStyle('Median Price per TB ($)'), beginAtZero: true },
-          y: axisStyle(),
-        },
-        plugins: {
-          ...CHART_DEFAULTS.plugins,
-          tooltip: {
-            ...CHART_DEFAULTS.plugins.tooltip,
-            callbacks: { label: ctx => ` $${ctx.parsed.x.toFixed(2)} / TB` },
-          },
-        },
-      },
-    });
-
-    // ── 3  Scatter: read speed vs price per TB ───────────────────────────
-    const scatterDatasets = mainTypes.map(t => ({
-      label: t,
-      data: byType[t]
-        .map(r => ({
-          x: parsePrice(r['Price per TB']),
-          y: parseFloat(r.read_speed_mbps),
-        }))
-        .filter(p => p.x && p.y && p.x < 200 && p.y < 8000),
-      backgroundColor: typeColor(t) + '99',
-      borderColor:     typeColor(t),
-      borderWidth: 1,
-      pointRadius: 4,
-      pointHoverRadius: 6,
-    }));
-
-    new Chart(document.getElementById('scatterChart'), {
-      type: 'scatter',
-      data: { datasets: scatterDatasets },
-      options: {
-        ...CHART_DEFAULTS,
-        scales: {
-          x: { ...axisStyle('Price per TB ($)'), min: 0 },
-          y: { ...axisStyle('Read Speed (MB/s)'), min: 0 },
-        },
-        plugins: {
-          ...CHART_DEFAULTS.plugins,
-          tooltip: {
-            ...CHART_DEFAULTS.plugins.tooltip,
-            callbacks: {
-              label: ctx => `${ctx.dataset.label}: $${ctx.parsed.x.toFixed(2)}/TB — ${ctx.parsed.y} MB/s`,
-            },
-          },
-        },
-      },
-    });
-
-    // Scatter legend
-    const legendEl = document.getElementById('scatter-legend');
-    mainTypes.forEach(t => {
-      legendEl.insertAdjacentHTML('beforeend',
-        `<div class="legend-item">
-           <div class="legend-dot" style="background:${typeColor(t)}"></div>${t}
-         </div>`);
-    });
-
-    // ── 4  Average read speed bar ─────────────────────────────────────────
-    const speedData = mainTypes.map(t => {
-      const speeds = byType[t].map(r => parseFloat(r.read_speed_mbps)).filter(n => !isNaN(n) && n > 0);
-      return { type: t, avg: avg(speeds) };
-    }).sort((a, b) => b.avg - a.avg);
-
-    new Chart(document.getElementById('speedChart'), {
-      type: 'bar',
-      data: {
-        labels: speedData.map(d => d.type),
-        datasets: [{
-          label: 'Avg Read Speed',
-          data: speedData.map(d => Math.round(d.avg)),
-          backgroundColor: speedData.map(d => typeColor(d.type) + 'cc'),
-          borderColor:      speedData.map(d => typeColor(d.type)),
-          borderWidth: 1,
-          borderRadius: 6,
-        }],
-      },
-      options: {
-        ...CHART_DEFAULTS,
-        scales: {
-          x: axisStyle(),
-          y: { ...axisStyle('MB/s'), beginAtZero: true },
-        },
-        plugins: {
-          ...CHART_DEFAULTS.plugins,
-          tooltip: {
-            ...CHART_DEFAULTS.plugins.tooltip,
-            callbacks: { label: ctx => ` ${ctx.parsed.y.toLocaleString()} MB/s` },
-          },
-        },
-      },
-    });
-
-    // ── 5  New vs Used ───────────────────────────────────────────────────
-    const newRec  = data.filter(r => (r.Condition || '').toLowerCase() === 'new');
-    const usedRec = data.filter(r => (r.Condition || '').toLowerCase() === 'used');
-    const newPrices  = newRec.map(r => parsePrice(r['Price per TB'])).filter(Boolean);
-    const usedPrices = usedRec.map(r => parsePrice(r['Price per TB'])).filter(Boolean);
-
-    new Chart(document.getElementById('conditionChart'), {
-      type: 'bar',
-      data: {
-        labels: ['New', 'Used'],
-        datasets: [
-          {
-            label: 'Listings',
-            data: [newRec.length, usedRec.length],
-            backgroundColor: ['#3b82f6cc', '#f59e0bcc'],
-            borderColor:      ['#3b82f6',   '#f59e0b'],
-            borderWidth: 1,
-            borderRadius: 6,
-            yAxisID: 'y',
-          },
-          {
-            label: 'Median $/TB',
-            data: [+median(newPrices).toFixed(2), +median(usedPrices).toFixed(2)],
-            backgroundColor: ['#6366f1cc', '#ec4899cc'],
-            borderColor:      ['#6366f1',   '#ec4899'],
-            borderWidth: 1,
-            borderRadius: 6,
-            yAxisID: 'y2',
-            type: 'bar',
-          },
-        ],
-      },
-      options: {
-        ...CHART_DEFAULTS,
-        scales: {
-          x: axisStyle(),
-          y:  { ...axisStyle('Listing Count'), beginAtZero: true, position: 'left' },
-          y2: { ...axisStyle('Median $/TB'),   beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } },
-        },
-        plugins: {
-          ...CHART_DEFAULTS.plugins,
-          legend: {
-            display: true,
-            labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12 },
-          },
-        },
-      },
-    });
-
-    // ── 6  Brand bar ─────────────────────────────────────────────────────
-    const brandCount = {};
-    data.forEach(r => {
-      const b = r.brand;
-      if (b && b !== 'Unknown') brandCount[b] = (brandCount[b] || 0) + 1;
-    });
-    const topBrands = Object.entries(brandCount)
-      .sort((a, b) => b[1] - a[1]).slice(0, 8);
-
-    new Chart(document.getElementById('brandChart'), {
-      type: 'bar',
-      data: {
-        labels: topBrands.map(([b]) => b),
-        datasets: [{
-          data: topBrands.map(([, n]) => n),
-          backgroundColor: '#6366f1cc',
-          borderColor: '#6366f1',
-          borderWidth: 1,
-          borderRadius: 6,
-        }],
-      },
-      options: {
-        ...CHART_DEFAULTS,
-        indexAxis: 'y',
-        scales: {
-          x: { ...axisStyle('Number of Listings'), beginAtZero: true },
-          y: axisStyle(),
-        },
-      },
-    });
-
-    // ── 7  Capacity histogram ─────────────────────────────────────────────
-    const buckets = [
-      { label: '< 0.5', min: 0,   max: 0.5  },
-      { label: '0.5–1', min: 0.5, max: 1    },
-      { label: '1–2',   min: 1,   max: 2    },
-      { label: '2–4',   min: 2,   max: 4    },
-      { label: '4–8',   min: 4,   max: 8    },
-      { label: '8–16',  min: 8,   max: 16   },
-      { label: '16+',   min: 16,  max: Infinity },
-    ];
-    const caps = data.map(r => typeof r.Capacity === 'number' ? r.Capacity : null).filter(Boolean);
-    const bucketCounts = buckets.map(b => caps.filter(c => c >= b.min && c < b.max).length);
-
-    new Chart(document.getElementById('capChart'), {
-      type: 'bar',
-      data: {
-        labels: buckets.map(b => b.label + ' TB'),
-        datasets: [{
-          data: bucketCounts,
-          backgroundColor: '#10b981cc',
-          borderColor: '#10b981',
-          borderWidth: 1,
-          borderRadius: 6,
-        }],
-      },
-      options: {
-        ...CHART_DEFAULTS,
-        scales: {
-          x: axisStyle('Capacity Range'),
-          y: { ...axisStyle('Number of Drives'), beginAtZero: true },
-        },
-      },
-    });
-
-    // ── 8  Rating bar ─────────────────────────────────────────────────────
-    const ratingByType = mainTypes.map(t => {
-      const rs = byType[t].map(r => parseFloat(r.average_rating)).filter(n => !isNaN(n) && n > 0);
-      return { type: t, avg: avg(rs) };
-    });
-
-    new Chart(document.getElementById('ratingChart'), {
-      type: 'bar',
-      data: {
-        labels: ratingByType.map(d => d.type),
-        datasets: [{
-          data: ratingByType.map(d => +d.avg.toFixed(2)),
-          backgroundColor: ratingByType.map(d => typeColor(d.type) + 'cc'),
-          borderColor:      ratingByType.map(d => typeColor(d.type)),
-          borderWidth: 1,
-          borderRadius: 6,
-        }],
-      },
-      options: {
-        ...CHART_DEFAULTS,
-        scales: {
-          x: axisStyle(),
-          y: { ...axisStyle('Avg Star Rating'), min: 3.5, max: 5 },
-        },
-        plugins: {
-          ...CHART_DEFAULTS.plugins,
-          tooltip: {
-            ...CHART_DEFAULTS.plugins.tooltip,
-            callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(2)} ★` },
-          },
-        },
-      },
-    });
-
-    // ── Show app ──────────────────────────────────────────────────────────
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
+  .then(r=>r.json())
+  .then(raw=>{
+    RAW=raw;
+    document.getElementById('loading').style.display='none';
+    document.getElementById('app').style.display='flex';
+    wireControls();
+    applyFilters();
   })
-  .catch(err => {
-    document.getElementById('loading').textContent = 'Failed to load data: ' + err.message;
+  .catch(err=>{
+    document.getElementById('loading').textContent='Failed to load data: '+err.message;
   });
 </script>
 </body>
