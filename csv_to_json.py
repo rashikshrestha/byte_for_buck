@@ -6,6 +6,7 @@ from pathlib import Path
 INPUT_CSV = "data/scrapped.csv"
 OUTPUT_JSON = "data/data_processed.json"
 DROP_COLUMNS = {"Warranty", "Form Factor"}
+UNKNOWN_BRANDS = {"unknown", "N/A", "n/a", "na", "none", "", "unknown brand", "not available"}
 
 
 def clean_capacity(value: str) -> float | str:
@@ -33,6 +34,8 @@ def main() -> None:
             for speed_col in ("read_speed_mbps", "write_speed_mbps"):
                 if row.get(speed_col) == "7200":
                     row[speed_col] = "0"
+            if row.get("drive_type", "").strip().lower() in UNKNOWN_BRANDS:
+                continue
             rows.append({k: v for k, v in row.items() if k not in DROP_COLUMNS})
 
     output_path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
