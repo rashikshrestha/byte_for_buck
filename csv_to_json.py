@@ -30,6 +30,9 @@ def main() -> None:
         for row in csv.DictReader(f):
             if "Capacity" in row:
                 row["Capacity"] = clean_capacity(row["Capacity"])
+            for speed_col in ("read_speed_mbps", "write_speed_mbps"):
+                if row.get(speed_col) == "7200":
+                    row[speed_col] = "0"
             rows.append({k: v for k, v in row.items() if k not in DROP_COLUMNS})
 
     output_path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
