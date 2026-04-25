@@ -643,15 +643,16 @@ function groupBy(arr,fn){ const m={}; arr.forEach(r=>{const k=fn(r);(m[k]=m[k]||
 let RAW = [];
 let filtered = [];
 const charts = {};
+let RANGES = { pptb:{min:5,max:160}, cap:{min:0,max:30}, spd:{min:0,max:12000} };
 
 const state = {
-  driveTypes: new Set(),   // empty = all
+  driveTypes: new Set(),
   condition: 'all',
   inStock: false,
   prime: false,
-  pptb: { min:4, max:39 },
-  cap:  { min:0, max:30 },
-  spd:  { min:0, max:7200 },
+  pptb: { min:5, max:160 },
+  cap:  { min:0, max:30  },
+  spd:  { min:0, max:12000 },
   minRating: 0,
   topN: 10,
   priceMetric: 'median',
@@ -735,9 +736,9 @@ function updatePills(){
   if(state.condition!=='all') pills.push({key:'cond',label:'Condition: '+state.condition});
   if(state.inStock) pills.push({key:'stock',label:'In-Stock'});
   if(state.prime)   pills.push({key:'prime',label:'Prime'});
-  if(state.pptb.min>4||state.pptb.max<39) pills.push({key:'pptb',label:'$'+state.pptb.min+'–$'+state.pptb.max+'/TB'});
-  if(state.cap.min>0||state.cap.max<30) pills.push({key:'cap',label:state.cap.min+'–'+state.cap.max+' TB'});
-  if(state.spd.min>0||state.spd.max<7200) pills.push({key:'spd',label:state.spd.min+'–'+state.spd.max+' MB/s'});
+  if(state.pptb.min>RANGES.pptb.min||state.pptb.max<RANGES.pptb.max) pills.push({key:'pptb',label:'$'+state.pptb.min+'–$'+state.pptb.max+'/TB'});
+  if(state.cap.min>RANGES.cap.min||state.cap.max<RANGES.cap.max) pills.push({key:'cap',label:state.cap.min+'–'+state.cap.max+' TB'});
+  if(state.spd.min>RANGES.spd.min||state.spd.max<RANGES.spd.max) pills.push({key:'spd',label:state.spd.min+'–'+state.spd.max+' MB/s'});
   if(state.minRating>0) pills.push({key:'rat',label:'★ ≥ '+state.minRating});
 
   const row=document.getElementById('pills-row');
@@ -772,20 +773,20 @@ function removePill(key){
     state.prime=false;
     document.getElementById('tog-prime').checked=false;
   } else if(key==='pptb'){
-    state.pptb={min:4,max:39};
-    document.getElementById('pptb-min').value=4;
-    document.getElementById('pptb-max').value=39;
-    updateRangeUI('pptb',4,39,4,39,'$','');
+    state.pptb={min:RANGES.pptb.min,max:RANGES.pptb.max};
+    document.getElementById('pptb-min').value=RANGES.pptb.min;
+    document.getElementById('pptb-max').value=RANGES.pptb.max;
+    updateRangeUI('pptb',RANGES.pptb.min,RANGES.pptb.max,RANGES.pptb.min,RANGES.pptb.max,'$','');
   } else if(key==='cap'){
-    state.cap={min:0,max:30};
-    document.getElementById('cap-min').value=0;
-    document.getElementById('cap-max').value=30;
-    updateRangeUI('cap',0,30,0,30,'','TB');
+    state.cap={min:RANGES.cap.min,max:RANGES.cap.max};
+    document.getElementById('cap-min').value=RANGES.cap.min;
+    document.getElementById('cap-max').value=RANGES.cap.max;
+    updateRangeUI('cap',RANGES.cap.min,RANGES.cap.max,RANGES.cap.min,RANGES.cap.max,'','TB');
   } else if(key==='spd'){
-    state.spd={min:0,max:7200};
-    document.getElementById('spd-min').value=0;
-    document.getElementById('spd-max').value=7200;
-    updateRangeUI('spd',0,7200,0,7200,'','');
+    state.spd={min:RANGES.spd.min,max:RANGES.spd.max};
+    document.getElementById('spd-min').value=RANGES.spd.min;
+    document.getElementById('spd-max').value=RANGES.spd.max;
+    updateRangeUI('spd',RANGES.spd.min,RANGES.spd.max,RANGES.spd.min,RANGES.spd.max,'','');
   } else if(key==='rat'){
     state.minRating=0;
     document.getElementById('min-rating').value=0;
@@ -914,17 +915,27 @@ function buildSpeed(){
   destroyChart('speed');
   const byType=groupBy(filtered,r=>r.drive_type||'');
   const mode=state.speedMode;
-  const types=Object.keys(byType).sort((a,b)=>byType[b].length-byType[a].length);
+  const allTypes=Object.keys(byType).sort((a,b)=>byType[b].length-byType[a].length);
+  if(!allTypes.length){ showEmpty('speedChart'); return; }
+
+  const avgOf=(recs,field)=>{
+    const vals=recs.map(r=>safeFloat(r[field])).filter(n=>n&&n>0);
+    return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
+  };
+
+  // Only include types that have at least one valid (>0) speed reading
+  const types=allTypes.filter(t=>{
+    if(mode==='read')  return avgOf(byType[t],'read_speed_mbps')!==null;
+    if(mode==='write') return avgOf(byType[t],'write_speed_mbps')!==null;
+    return avgOf(byType[t],'read_speed_mbps')!==null||avgOf(byType[t],'write_speed_mbps')!==null;
+  });
   if(!types.length){ showEmpty('speedChart'); return; }
 
   const datasets=[];
   if(mode==='read'||mode==='both'){
     datasets.push({
       label:'Read',
-      data:types.map(t=>{
-        const s=byType[t].map(r=>safeFloat(r.read_speed_mbps)).filter(n=>n&&n>0);
-        return s.length?Math.round(s.reduce((a,b)=>a+b,0)/s.length):0;
-      }),
+      data:types.map(t=>avgOf(byType[t],'read_speed_mbps')||0),
       backgroundColor:types.map(t=>tc(t)+'cc'),
       borderColor:types.map(t=>tc(t)),
       borderWidth:1,borderRadius:5,
@@ -933,10 +944,7 @@ function buildSpeed(){
   if(mode==='write'||mode==='both'){
     datasets.push({
       label:'Write',
-      data:types.map(t=>{
-        const s=byType[t].map(r=>safeFloat(r.write_speed_mbps)).filter(n=>n&&n>0);
-        return s.length?Math.round(s.reduce((a,b)=>a+b,0)/s.length):0;
-      }),
+      data:types.map(t=>avgOf(byType[t],'write_speed_mbps')||0),
       backgroundColor:types.map(t=>tc(t)+'66'),
       borderColor:types.map(t=>tc(t)),
       borderWidth:1,borderRadius:5,
@@ -1215,8 +1223,8 @@ const PROD_COLS = [
   {k:'Condition',    h:'Condition',    fmt:v=>v||'—'},
   {k:'average_rating',h:'Rating',      cls:'col-rating',fmt:v=>v?v+' ★':'—'},
   {k:'total_no_of_reviews',h:'Reviews',fmt:v=>v?Number(v).toLocaleString():'—'},
-  {k:'read_speed_mbps', h:'Read MB/s', fmt:v=>v||'—'},
-  {k:'write_speed_mbps',h:'Write MB/s',fmt:v=>v||'—'},
+  {k:'read_speed_mbps', h:'Read MB/s', fmt:v=>{const n=safeFloat(v);return (n&&n>0)?n:'<span style="color:var(--muted);font-style:italic">N/A</span>';}},
+  {k:'write_speed_mbps',h:'Write MB/s',fmt:v=>{const n=safeFloat(v);return (n&&n>0)?n:'<span style="color:var(--muted);font-style:italic">N/A</span>';}},
   {k:'interface',    h:'Interface',    fmt:v=>v||'—'},
   {k:'form_factor',  h:'Form',         fmt:v=>v||'—'},
   {k:'in_stock',     h:'Stock',        fmt:v=>{
@@ -1327,11 +1335,11 @@ function wireControls(){
   });
 
   // Dual range sliders
-  bindDualRange('pptb',4,39,'$','',
+  bindDualRange('pptb',RANGES.pptb.min,RANGES.pptb.max,'$','',
     (lo,hi)=>{ state.pptb={min:lo,max:hi}; applyFilters(); });
-  bindDualRange('cap',0,30,'','TB',
+  bindDualRange('cap',RANGES.cap.min,RANGES.cap.max,'','TB',
     (lo,hi)=>{ state.cap={min:lo,max:hi}; applyFilters(); });
-  bindDualRange('spd',0,7200,'','',
+  bindDualRange('spd',RANGES.spd.min,RANGES.spd.max,'','',
     (lo,hi)=>{ state.spd={min:lo,max:hi}; applyFilters(); });
 
   // Min rating
@@ -1385,26 +1393,26 @@ function wireControls(){
     state.condition='all';
     state.inStock=false;
     state.prime=false;
-    state.pptb={min:4,max:39};
-    state.cap={min:0,max:30};
-    state.spd={min:0,max:7200};
+    state.pptb={min:RANGES.pptb.min,max:RANGES.pptb.max};
+    state.cap ={min:RANGES.cap.min, max:RANGES.cap.max};
+    state.spd ={min:RANGES.spd.min, max:RANGES.spd.max};
     state.minRating=0;
 
     document.querySelectorAll('.type-pill').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.radio-tab').forEach(b=>b.classList.toggle('active',b.dataset.cond==='all'));
     document.getElementById('tog-stock').checked=false;
     document.getElementById('tog-prime').checked=false;
-    document.getElementById('pptb-min').value=4;
-    document.getElementById('pptb-max').value=39;
-    document.getElementById('cap-min').value=0;
-    document.getElementById('cap-max').value=30;
-    document.getElementById('spd-min').value=0;
-    document.getElementById('spd-max').value=7200;
+    document.getElementById('pptb-min').value=RANGES.pptb.min;
+    document.getElementById('pptb-max').value=RANGES.pptb.max;
+    document.getElementById('cap-min').value=RANGES.cap.min;
+    document.getElementById('cap-max').value=RANGES.cap.max;
+    document.getElementById('spd-min').value=RANGES.spd.min;
+    document.getElementById('spd-max').value=RANGES.spd.max;
     document.getElementById('min-rating').value=0;
     document.getElementById('rating-label').textContent='0 ★';
-    updateRangeUI('pptb',4,39,4,39,'$','');
-    updateRangeUI('cap',0,30,0,30,'','TB');
-    updateRangeUI('spd',0,7200,0,7200,'','');
+    updateRangeUI('pptb',RANGES.pptb.min,RANGES.pptb.max,RANGES.pptb.min,RANGES.pptb.max,'$','');
+    updateRangeUI('cap',RANGES.cap.min,RANGES.cap.max,RANGES.cap.min,RANGES.cap.max,'','TB');
+    updateRangeUI('spd',RANGES.spd.min,RANGES.spd.max,RANGES.spd.min,RANGES.spd.max,'','');
     applyFilters();
   });
 }
@@ -1416,6 +1424,32 @@ fetch('data/data_v1.json')
   .then(r=>r.json())
   .then(raw=>{
     RAW=raw;
+
+    // Compute actual data ranges so filters are never too narrow
+    const allPptb=RAW.map(r=>parsePrice(r['Price per TB'])).filter(n=>n!==null);
+    const allCap =RAW.map(r=>typeof r.Capacity==='number'?r.Capacity:null).filter(v=>v!==null);
+    const allSpd =RAW.map(r=>safeFloat(r.read_speed_mbps)).filter(n=>n&&n>0);
+    RANGES={
+      pptb:{min:Math.floor(Math.min(...allPptb)),     max:Math.ceil(Math.max(...allPptb))},
+      cap: {min:0,                                    max:Math.ceil(Math.max(...allCap))},
+      spd: {min:0, max:Math.ceil(Math.max(...allSpd)/100)*100},
+    };
+
+    // Init state to full ranges (= no filter active)
+    state.pptb={min:RANGES.pptb.min,max:RANGES.pptb.max};
+    state.cap ={min:RANGES.cap.min, max:RANGES.cap.max};
+    state.spd ={min:RANGES.spd.min, max:RANGES.spd.max};
+
+    // Sync slider min/max/value attributes to real data
+    ['pptb','cap','spd'].forEach(id=>{
+      const r=RANGES[id];
+      ['min','max'].forEach(thumb=>{
+        const el=document.getElementById(id+'-'+thumb);
+        el.min=r.min; el.max=r.max;
+        el.value=(thumb==='min'?r.min:r.max);
+      });
+    });
+
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='flex';
     wireControls();
