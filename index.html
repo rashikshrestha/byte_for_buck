@@ -841,7 +841,7 @@ function destroyChart(key){
 
 function buildDonut(){
   destroyChart('donut');
-  const byType=groupBy(filtered,r=>r.drive_type||'');
+  const byType=groupBy(filtered.filter(r=>r.drive_type&&r.drive_type.trim()),r=>r.drive_type);
   const types=Object.keys(byType).sort((a,b)=>byType[b].length-byType[a].length);
   if(!types.length){ showEmpty('donutChart'); return; }
   charts['donut']=new Chart(document.getElementById('donutChart'),{
@@ -879,7 +879,7 @@ function buildDonut(){
 
 function buildPrice(){
   destroyChart('price');
-  const byType=groupBy(filtered,r=>r.drive_type||'');
+  const byType=groupBy(filtered.filter(r=>r.drive_type&&r.drive_type.trim()),r=>r.drive_type);
   const metric = state.priceMetric;
   const rows=Object.entries(byType).map(([t,recs])=>{
     const prices=recs.map(r=>parsePrice(r['Price per TB'])).filter(Boolean);
@@ -921,7 +921,7 @@ function buildPrice(){
 
 function buildSpeed(){
   destroyChart('speed');
-  const byType=groupBy(filtered,r=>r.drive_type||'');
+  const byType=groupBy(filtered.filter(r=>r.drive_type&&r.drive_type.trim()),r=>r.drive_type);
   const mode=state.speedMode;
   const allTypes=Object.keys(byType).sort((a,b)=>byType[b].length-byType[a].length);
   if(!allTypes.length){ showEmpty('speedChart'); return; }
@@ -1161,7 +1161,7 @@ function buildBrand(){
 
 function buildRating(){
   destroyChart('rating');
-  const byType=groupBy(filtered,r=>r.drive_type||'');
+  const byType=groupBy(filtered.filter(r=>r.drive_type&&r.drive_type.trim()),r=>r.drive_type);
   const types=Object.keys(byType).sort((a,b)=>byType[b].length-byType[a].length);
   const avgs=types.map(t=>{
     const rs=byType[t].map(r=>safeFloat(r.average_rating)).filter(n=>n&&n>0);
