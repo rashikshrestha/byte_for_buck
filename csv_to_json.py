@@ -3,8 +3,8 @@ import json
 import re
 from pathlib import Path
 
-INPUT_CSV = "data/data_v1.csv"
-OUTPUT_JSON = "data/data_v1.json"
+INPUT_CSV = "data/scrapped.csv"
+OUTPUT_JSON = "data/data_processed.json"
 DROP_COLUMNS = {"Warranty", "Form Factor"}
 
 
