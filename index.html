@@ -237,6 +237,69 @@ body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);f
   height:100vh;font-size:.95rem;color:var(--muted);gap:.7rem
 }
 #app{display:none;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ── Product Modal ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:#000a;
+  z-index:1000;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);padding:1rem;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  width:min(96vw,1160px);max-height:88vh;display:flex;flex-direction:column;
+  box-shadow:0 30px 70px #000c;overflow:hidden;
+}
+.modal-head{
+  display:flex;align-items:center;gap:1rem;padding:.9rem 1.2rem;
+  border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface2);
+}
+.modal-title{font-size:.9rem;font-weight:700;color:var(--text);flex:1}
+.modal-meta{font-size:.72rem;color:var(--muted);flex-shrink:0}
+.modal-hint{font-size:.68rem;color:var(--muted);flex-shrink:0;opacity:.6}
+.modal-close{
+  background:none;border:1px solid var(--border);border-radius:6px;
+  color:var(--muted);cursor:pointer;font-size:.8rem;
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;flex-shrink:0;
+}
+.modal-close:hover{border-color:var(--accent);color:var(--text);background:var(--accent)22}
+.modal-body{overflow:auto;flex:1;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.modal-body::-webkit-scrollbar{width:5px;height:5px}
+.modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.prod-table{width:100%;border-collapse:collapse;font-size:.72rem}
+.prod-table th{
+  position:sticky;top:0;background:var(--surface2);
+  padding:.55rem .9rem;text-align:left;font-size:.6rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.07em;color:var(--muted);
+  border-bottom:2px solid var(--border);white-space:nowrap;z-index:1;
+}
+.prod-table td{
+  padding:.5rem .9rem;border-bottom:1px solid var(--border)33;
+  color:var(--muted2);vertical-align:middle;white-space:nowrap;
+}
+.prod-table td.col-name{color:var(--text);font-weight:500;max-width:280px;
+  overflow:hidden;text-overflow:ellipsis}
+.prod-table td.col-price{color:var(--green);font-weight:600}
+.prod-table td.col-pptb{color:var(--accent2);font-weight:600}
+.prod-table td.col-rating{color:var(--yellow)}
+.prod-table tbody tr{cursor:pointer;transition:background .1s}
+.prod-table tbody tr:hover{background:var(--accent)0d}
+.prod-table tbody tr:hover td{color:var(--text)}
+.prod-table tbody tr:hover td.col-price{color:var(--green)}
+.prod-table tbody tr:hover td.col-pptb{color:var(--accent2)}
+.prod-table tbody tr:hover td.col-rating{color:var(--yellow)}
+.pm-badge{
+  display:inline-block;border-radius:4px;padding:.1rem .38rem;font-size:.6rem;font-weight:700;
+}
+.pm-yes{background:#10b98120;color:#10b981;border:1px solid #10b98140}
+.pm-no{background:#ef444420;color:#ef4444;border:1px solid #ef444440}
+.pm-lim{background:#f59e0b20;color:#f59e0b;border:1px solid #f59e0b40}
+.pm-type-dot{
+  display:inline-block;width:8px;height:8px;border-radius:50%;
+  margin-right:.35rem;vertical-align:middle;flex-shrink:0;
+}
 </style>
 </head>
 <body>
@@ -249,7 +312,7 @@ body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);f
   <div class="topbar">
     <div>
       <h1>Storage Market Dashboard</h1>
-      <div class="subtitle">607 Amazon drive listings · Price · Speed · Value</div>
+      <div class="subtitle">Amazon disk drive listings · Price · Speed · Value</div>
     </div>
     <div class="spacer"></div>
     <div class="count-badge">Showing <span id="count-shown">–</span> of <span id="count-total">–</span> drives</div>
@@ -425,7 +488,7 @@ body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);f
             <div class="card-title">Market Share<span>Drive Type Distribution</span></div>
           </div>
           <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
-          <div class="insight"><b>Tip:</b> Click a segment to filter by that drive type.</div>
+          <div class="insight"><b>Tip:</b> Click a segment to view all products of that drive type.</div>
         </div>
 
         <!-- Price/TB -->
@@ -493,6 +556,24 @@ body{display:flex;flex-direction:column;background:var(--bg);color:var(--text);f
       </div><!-- /grid -->
     </div><!-- /main -->
   </div><!-- /body-layout -->
+  <!-- Product list modal -->
+  <div id="modal-overlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <div class="modal-title" id="modal-title">Products</div>
+        <div class="modal-meta" id="modal-meta"></div>
+        <div class="modal-hint">Click a row to open on Amazon ↗</div>
+        <button class="modal-close" id="modal-close" title="Close (Esc)">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="prod-table">
+          <thead id="prod-thead"></thead>
+          <tbody id="prod-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /app -->
 
 <script>
@@ -541,6 +622,7 @@ function fieldVal(r, key){
 const CHART_OPTS = {
   responsive:true,maintainAspectRatio:false,
   animation:{duration:300},
+  onHover:(evt,els)=>{ if(evt.native) evt.native.target.style.cursor=els.length?'pointer':'default'; },
   plugins:{
     legend:{display:false},
     tooltip:{backgroundColor:'#1e2235',titleColor:'#e2e8f0',bodyColor:'#94a3b8',padding:10,cornerRadius:8}
@@ -780,12 +862,7 @@ function buildDonut(){
       onClick(_,els){
         if(!els.length) return;
         const t=types[els[0].index];
-        const OTHER=['LTO Tape Cartridge','Data Cartridge','Tape Drive','Hybrid',''];
-        const bucket=OTHER.includes(t)?'other':t;
-        if(state.driveTypes.has(bucket)) state.driveTypes.delete(bucket);
-        else state.driveTypes.add(bucket);
-        document.querySelector(`.type-pill[data-type="${bucket}"]`)?.classList.toggle('active',state.driveTypes.has(bucket));
-        applyFilters();
+        showProductModal(byType[t], t+' Drives');
       }
     }
   });
@@ -818,6 +895,11 @@ function buildPrice(){
       scales:{
         x:{...axisStyle('$/TB'),beginAtZero:true},
         y:axisStyle()
+      },
+      onClick(_,els){
+        if(!els.length) return;
+        const d=rows[els[0].index];
+        showProductModal(byType[d.t], 'Cost/TB · '+d.t);
       },
       plugins:{...CHART_OPTS.plugins,
         tooltip:{...CHART_OPTS.plugins.tooltip,
@@ -867,6 +949,11 @@ function buildSpeed(){
     data:{labels:types,datasets},
     options:{
       ...CHART_OPTS,
+      onClick(_,els){
+        if(!els.length) return;
+        const t=types[els[0].index];
+        showProductModal(byType[t], 'Speed · '+t);
+      },
       plugins:{...CHART_OPTS.plugins,
         legend:{display:mode==='both',labels:{color:'#94a3b8',font:{size:10},boxWidth:10}}},
       scales:{
@@ -899,7 +986,7 @@ function buildScatter(){
     const x=fieldVal(r,xk), y=fieldVal(r,yk);
     if(x===null||y===null) return;
     const cv=ck==='in_stock'?String(r[ck]||'').toLowerCase():r[ck]||'';
-    (groups[cv]=groups[cv]||[]).push({x,y,label:r.product_name||''});
+    (groups[cv]=groups[cv]||[]).push({x,y,label:r.product_name||'',_r:r});
   });
 
   const datasets=Object.entries(groups).map(([gk,pts])=>{
@@ -930,6 +1017,12 @@ function buildScatter(){
     data:{datasets},
     options:{
       ...CHART_OPTS,
+      onClick(_,els){
+        if(!els.length) return;
+        const el=els[0];
+        const pt=datasets[el.datasetIndex].data[el.index];
+        if(pt._r) showProductModal([pt._r], pt._r.product_name||'Product Detail');
+      },
       scales:{
         x:{...axisStyle(FIELD_LABELS[xk]),min:0},
         y:{...axisStyle(FIELD_LABELS[yk]),min:0}
@@ -954,6 +1047,7 @@ function buildCond(){
   const newP=newRec.map(r=>parsePrice(r['Price per TB'])).filter(Boolean);
   const usedP=usedRec.map(r=>parsePrice(r['Price per TB'])).filter(Boolean);
 
+  const condRecs=[newRec,usedRec];
   charts['cond']=new Chart(document.getElementById('condChart'),{
     type:'bar',
     data:{
@@ -969,6 +1063,12 @@ function buildCond(){
     },
     options:{
       ...CHART_OPTS,
+      onClick(_,els){
+        if(!els.length) return;
+        const idx=els[0].index;
+        const label=['New','Used'][idx];
+        showProductModal(condRecs[idx], label+' Drives');
+      },
       plugins:{...CHART_OPTS.plugins,
         legend:{display:true,labels:{color:'#94a3b8',font:{size:10},boxWidth:10}}},
       scales:{
@@ -1001,6 +1101,15 @@ function buildCap(){
     },
     options:{
       ...CHART_OPTS,
+      onClick(_,els){
+        if(!els.length) return;
+        const b=buckets[els[0].index];
+        const recs=filtered.filter(r=>{
+          const c=typeof r.Capacity==='number'?r.Capacity:null;
+          return c!==null&&c>=b.mn&&c<b.mx;
+        });
+        showProductModal(recs,'Capacity '+b.l);
+      },
       scales:{x:axisStyle('Capacity'),y:{...axisStyle('Count'),beginAtZero:true}}
     }
   });
@@ -1024,6 +1133,11 @@ function buildBrand(){
     },
     options:{
       ...CHART_OPTS,indexAxis:'y',
+      onClick(_,els){
+        if(!els.length) return;
+        const brand=top[els[0].index][0];
+        showProductModal(filtered.filter(r=>r.brand===brand),'Brand · '+brand);
+      },
       scales:{x:{...axisStyle('Listings'),beginAtZero:true},y:axisStyle()}
     }
   });
@@ -1050,6 +1164,11 @@ function buildRating(){
     },
     options:{
       ...CHART_OPTS,
+      onClick(_,els){
+        if(!els.length) return;
+        const t=types[els[0].index];
+        showProductModal(byType[t],'Rating · '+t);
+      },
       scales:{
         x:axisStyle(),
         y:{...axisStyle('Avg Rating'),min:3,max:5}
@@ -1082,6 +1201,84 @@ function clearEmpty(canvasId){
   canvas.style.display='';
   canvas.parentElement.querySelector('.empty-state')?.remove();
 }
+
+// ═══════════════════════════════════════════════════════
+//  PRODUCT MODAL
+// ═══════════════════════════════════════════════════════
+const PROD_COLS = [
+  {k:'product_name', h:'Product',      cls:'col-name', fmt:v=>v||'—'},
+  {k:'brand',        h:'Brand',        fmt:v=>v||'—'},
+  {k:'drive_type',   h:'Type',         fmt:(v)=>`<span class="pm-type-dot" style="background:${tc(v||'')}"></span>${v||'—'}`},
+  {k:'Capacity',     h:'Cap (TB)',     fmt:v=>typeof v==='number'?v.toFixed(2):v||'—'},
+  {k:'Price',        h:'Price',        cls:'col-price', fmt:v=>v||'—'},
+  {k:'Price per TB', h:'$/TB',         cls:'col-pptb',  fmt:v=>v||'—'},
+  {k:'Condition',    h:'Condition',    fmt:v=>v||'—'},
+  {k:'average_rating',h:'Rating',      cls:'col-rating',fmt:v=>v?v+' ★':'—'},
+  {k:'total_no_of_reviews',h:'Reviews',fmt:v=>v?Number(v).toLocaleString():'—'},
+  {k:'read_speed_mbps', h:'Read MB/s', fmt:v=>v||'—'},
+  {k:'write_speed_mbps',h:'Write MB/s',fmt:v=>v||'—'},
+  {k:'interface',    h:'Interface',    fmt:v=>v||'—'},
+  {k:'form_factor',  h:'Form',         fmt:v=>v||'—'},
+  {k:'in_stock',     h:'Stock',        fmt:v=>{
+    const s=String(v||'').toLowerCase();
+    if(s==='yes'||s==='true') return '<span class="pm-badge pm-yes">In Stock</span>';
+    if(s==='limited') return '<span class="pm-badge pm-lim">Limited</span>';
+    return '<span class="pm-badge pm-no">No</span>';
+  }},
+  {k:'prime_eligible',h:'Prime',       fmt:v=>{
+    const s=String(v||'').toLowerCase();
+    return (s==='yes'||s==='true')?'<span class="pm-badge pm-yes">✓ Prime</span>':'—';
+  }},
+];
+
+function showProductModal(records, title){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-meta').textContent =
+    records.length.toLocaleString()+' product'+(records.length===1?'':'s');
+
+  const thead = document.getElementById('prod-thead');
+  const tbody = document.getElementById('prod-tbody');
+  thead.innerHTML = '<tr>'+PROD_COLS.map(c=>`<th>${c.h}</th>`).join('')+'</tr>';
+  tbody.innerHTML = '';
+
+  // Sort by Price/TB ascending, nulls last
+  const sorted = [...records].sort((a,b)=>{
+    const pa=parsePrice(a['Price per TB']), pb=parsePrice(b['Price per TB']);
+    if(pa===null && pb===null) return 0;
+    if(pa===null) return 1;
+    if(pb===null) return -1;
+    return pa-pb;
+  });
+
+  sorted.forEach(r=>{
+    const tr = document.createElement('tr');
+    const url = r['Affiliate Link']||'';
+    if(url) tr.title = 'Open Amazon listing in new tab';
+    tr.addEventListener('click',()=>{ if(url) window.open(url,'_blank','noopener,noreferrer'); });
+    tr.innerHTML = PROD_COLS.map(c=>{
+      const raw = r[c.k];
+      const rendered = c.fmt ? c.fmt(raw) : (raw!=null&&raw!==''?raw:'—');
+      const plain = String(raw||'').replace(/"/g,'&quot;');
+      return `<td class="${c.cls||''}" title="${plain}">${rendered}</td>`;
+    }).join('');
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+(function wireModal(){
+  document.getElementById('modal-close').addEventListener('click',()=>{
+    document.getElementById('modal-overlay').classList.remove('open');
+  });
+  document.getElementById('modal-overlay').addEventListener('click',e=>{
+    if(e.target.id==='modal-overlay')
+      document.getElementById('modal-overlay').classList.remove('open');
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape') document.getElementById('modal-overlay').classList.remove('open');
+  });
+})();
 
 function updateAllCharts(){
   ['donutChart','priceChart','speedChart','scatterChart','condChart','capChart','brandChart','ratingChart']
